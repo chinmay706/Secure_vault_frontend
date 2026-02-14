@@ -25,6 +25,7 @@ export type {
   StatsResponse,
   AdminStatsResponse,
   AdminFilesResponse,
+  TrashResponse,
 } from "./types";
 
 // Re-export commonly used Apollo Client types for convenience

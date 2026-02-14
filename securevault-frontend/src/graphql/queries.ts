@@ -309,7 +309,45 @@ export const PUBLIC_FOLDER = gql`
   }
 `;
 
-// 10. Admin Stats (admin only)
+// 10. Trash (list trashed items with pagination)
+export const TRASH = gql`
+  query Trash($page: Int, $page_size: Int) {
+    trash(page: $page, page_size: $page_size) {
+      files {
+        id
+        original_filename
+        mime_type
+        size_bytes
+        folder_id
+        is_public
+        download_count
+        tags
+        created_at
+        updated_at
+        deleted_at
+        share_link {
+          token
+          is_active
+          download_count
+          created_at
+        }
+      }
+      folders {
+        id
+        name
+        parent_id
+        created_at
+        updated_at
+        deleted_at
+      }
+      page
+      page_size
+      total
+    }
+  }
+`;
+
+// 11. Admin Stats (admin only)
 export const ADMIN_STATS = gql`
   query AdminStats {
     adminStats {

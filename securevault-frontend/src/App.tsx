@@ -17,6 +17,7 @@ import { AdminFilesPage } from './pages/AdminFilesPage';
 import { PublicFolderPage } from './pages/PublicFolderPage';
 import { PublicFilePage } from './pages/PublicFilePage';
 import { SharedFilesPage } from './pages/SharedFilesPage';
+import { TrashPage } from './pages/TrashPage';
 import { ToastContainer } from './components/ui/Toast';
 
 const AppRoutes: React.FC = () => {
@@ -51,6 +52,7 @@ const AppRoutes: React.FC = () => {
             <Route index element={<MainPage />} />
             <Route path="folder/:folderId" element={<MainPage />} />
             <Route path="shared" element={<SharedFilesPage />} />
+            <Route path="trash" element={<TrashPage />} />
           </Route>
 
           {/* Admin routes */}

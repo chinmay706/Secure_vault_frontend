@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { FolderPlus, LayoutGrid, List as ListIcon, ArrowUp, ArrowDown } from 'lucide-react';
 import { useQuery, useMutation } from '@apollo/client';
 import { FileItem, FolderChildrenResponse, FolderItem as FolderType } from '../types';
-import { FILES, FOLDERS_ONLY, FOLDER, CREATE_FOLDER, DELETE_FILE, DELETE_FOLDER } from '../graphql';
+import { FILES, FOLDERS_ONLY, FOLDER, CREATE_FOLDER, TRASH_FILE, TRASH_FOLDER } from '../graphql';
 import { useToast } from '../hooks/useToast';
 import { useAuth } from '../contexts/AuthContext';
 import { useSearch } from '../hooks/useSearch';
@@ -111,6 +111,7 @@ export const MainPage: React.FC = () => {
     variables: {
       parent_id: isRoot ? null : folderId,
     },
+    fetchPolicy: 'cache-and-network',
   });
 
   // Files query
@@ -125,6 +126,7 @@ export const MainPage: React.FC = () => {
       page: currentPage,
       page_size: 20
     },
+    fetchPolicy: 'cache-and-network',
   });
 
   // Query folder details for breadcrumbs
@@ -150,25 +152,25 @@ export const MainPage: React.FC = () => {
     }
   });
 
-  // Delete file mutation
-  const [deleteFile] = useMutation(DELETE_FILE, {
+  // Trash file mutation (soft-delete)
+  const [trashFile] = useMutation(TRASH_FILE, {
     onCompleted: () => {
-      addToast('success', 'File deleted successfully!');
+      addToast('success', 'File moved to trash');
       refetchData();
     },
     onError: (error) => {
-      addToast('error', `Failed to delete file: ${error.message}`);
+      addToast('error', `Failed to move file to trash: ${error.message}`);
     }
   });
 
-  // Delete folder mutation
-  const [deleteFolder] = useMutation(DELETE_FOLDER, {
+  // Trash folder mutation (soft-delete)
+  const [trashFolder] = useMutation(TRASH_FOLDER, {
     onCompleted: () => {
-      addToast('success', 'Folder deleted successfully!');
+      addToast('success', 'Folder moved to trash');
       refetchData();
     },
     onError: (error) => {
-      addToast('error', `Failed to delete folder: ${error.message}`);
+      addToast('error', `Failed to move folder to trash: ${error.message}`);
     }
   });
 
@@ -369,8 +371,8 @@ export const MainPage: React.FC = () => {
   const confirmDeleteFile = async () => {
     if (!fileToDelete) return;
     try {
-      addToast('info', `Deleting "${fileToDelete.original_filename}"...`);
-      await deleteFile({ variables: { id: fileToDelete.id } });
+      addToast('info', `Moving "${fileToDelete.original_filename}" to trash...`);
+      await trashFile({ variables: { id: fileToDelete.id } });
     } catch {
       // Error is handled by the mutation's onError callback
     } finally {
@@ -392,8 +394,8 @@ export const MainPage: React.FC = () => {
   const confirmDeleteFolder = async () => {
     if (!folderToDelete) return;
     try {
-      addToast('info', `Deleting folder "${folderToDelete.name}"...`);
-      await deleteFolder({ variables: { id: folderToDelete.id, recursive: true } });
+      addToast('info', `Moving folder "${folderToDelete.name}" to trash...`);
+      await trashFolder({ variables: { id: folderToDelete.id, recursive: true } });
     } catch {
       // Error is handled by the mutation's onError callback
     } finally {
@@ -627,26 +629,26 @@ export const MainPage: React.FC = () => {
       {/* Preview Modal */}
       <PreviewModal file={previewFile} isOpen={!!previewFile} onClose={() => setPreviewFile(null)} onDownload={handleFileDownload} />
 
-      {/* Delete Confirmation Dialog */}
+      {/* Move to Trash Confirmation Dialog */}
       <ConfirmDialog
         isOpen={showDeleteConfirm}
         onClose={cancelDeleteFile}
         onConfirm={confirmDeleteFile}
-        title="Delete File"
-        message={fileToDelete ? `Are you sure you want to delete "${fileToDelete.original_filename}"?\n\nThis action cannot be undone.` : "Are you sure you want to delete this file?"}
-        confirmText="Delete File"
+        title="Move to Trash"
+        message={fileToDelete ? `Move "${fileToDelete.original_filename}" to trash?\n\nYou can restore it later from the Trash page.` : "Move this file to trash?"}
+        confirmText="Move to Trash"
         cancelText="Cancel"
         variant="danger"
       />
 
-      {/* Folder Delete Confirmation Dialog */}
+      {/* Folder Move to Trash Confirmation Dialog */}
       <ConfirmDialog
         isOpen={showFolderDeleteConfirm}
         onClose={cancelDeleteFolder}
         onConfirm={confirmDeleteFolder}
-        title="Delete Folder"
-        message={folderToDelete ? `Are you sure you want to delete the folder "${folderToDelete.name}" and all its contents?\n\nThis action cannot be undone.` : "Are you sure you want to delete this folder?"}
-        confirmText="Delete Folder"
+        title="Move to Trash"
+        message={folderToDelete ? `Move the folder "${folderToDelete.name}" and all its contents to trash?\n\nYou can restore it later from the Trash page.` : "Move this folder to trash?"}
+        confirmText="Move to Trash"
         cancelText="Cancel"
         variant="danger"
       />

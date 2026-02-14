@@ -135,3 +135,60 @@ export const ADMIN_DELETE_FILE = gql`
     adminDeleteFile(id: $id)
   }
 `;
+
+// 13. Trash File (soft-delete)
+export const TRASH_FILE = gql`
+  mutation TrashFile($id: UUID!) {
+    trashFile(id: $id)
+  }
+`;
+
+// 14. Trash Folder (soft-delete)
+export const TRASH_FOLDER = gql`
+  mutation TrashFolder($id: UUID!, $recursive: Boolean = true) {
+    trashFolder(id: $id, recursive: $recursive)
+  }
+`;
+
+// 15. Restore File from Trash
+export const RESTORE_FILE = gql`
+  mutation RestoreFile($id: UUID!) {
+    restoreFile(id: $id) {
+      id
+      original_filename
+      folder_id
+    }
+  }
+`;
+
+// 16. Restore Folder from Trash
+export const RESTORE_FOLDER = gql`
+  mutation RestoreFolder($id: UUID!) {
+    restoreFolder(id: $id) {
+      id
+      name
+      parent_id
+    }
+  }
+`;
+
+// 17. Permanent Delete File (from trash)
+export const PERMANENT_DELETE_FILE = gql`
+  mutation PermanentDeleteFile($id: UUID!) {
+    permanentDeleteFile(id: $id)
+  }
+`;
+
+// 18. Permanent Delete Folder (from trash)
+export const PERMANENT_DELETE_FOLDER = gql`
+  mutation PermanentDeleteFolder($id: UUID!) {
+    permanentDeleteFolder(id: $id)
+  }
+`;
+
+// 19. Empty Trash (delete all trashed items)
+export const EMPTY_TRASH = gql`
+  mutation EmptyTrash {
+    emptyTrash
+  }
+`;

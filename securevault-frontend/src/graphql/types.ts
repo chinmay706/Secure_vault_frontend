@@ -39,6 +39,7 @@ export interface FileItem {
   tags?: string[];
   created_at?: string;
   updated_at?: string;
+  deleted_at?: string | null;
   share_link?: ShareLink | null;
 }
 
@@ -50,6 +51,7 @@ export interface FolderItem {
   parent_id?: string | null;
   created_at?: string;
   updated_at?: string;
+  deleted_at?: string | null;
   share_link?: ShareLink | null;
 }
 
@@ -83,6 +85,15 @@ export interface StatsResponse {
 // List and pagination response types
 export interface FileListResponse {
   files: FileItem[];
+  page: number;
+  page_size: number;
+  total: number;
+}
+
+// Trash response type
+export interface TrashResponse {
+  files: FileItem[];
+  folders: FolderItem[];
   page: number;
   page_size: number;
   total: number;

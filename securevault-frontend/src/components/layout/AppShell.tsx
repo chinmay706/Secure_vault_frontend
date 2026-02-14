@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Outlet, Link, useLocation, Navigate } from 'react-router-dom';
-import { Shield, LogOut, Home, Settings, Search, Menu, Database, File, Globe } from 'lucide-react';
+import { Shield, LogOut, Home, Settings, Search, Menu, Database, File, Globe, Trash2 } from 'lucide-react';
 import { useQuery } from '@apollo/client';
 import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../ui/Button';
@@ -146,6 +146,7 @@ export const AppShell: React.FC = () => {
   const isAdmin = user.role === 'admin';
   const isAdminPage = location.pathname.startsWith('/admin');
   const isSharedPage = location.pathname === '/app/shared';
+  const isTrashPage = location.pathname === '/app/trash';
 
   const quotaUsed = stats?.quota_used_bytes || stats?.total_size_bytes || 0;
   const quotaTotal = stats?.quota_bytes || 104857600;
@@ -257,13 +258,19 @@ export const AppShell: React.FC = () => {
                 to="/app"
                 icon={Home}
                 label="Home"
-                active={location.pathname === '/app' || (location.pathname.startsWith('/app/folder') && !isSharedPage)}
+                active={location.pathname === '/app' || (location.pathname.startsWith('/app/folder') && !isSharedPage && !isTrashPage)}
               />
               <NavItem
                 to="/app/shared"
                 icon={Globe}
                 label="Shared Files"
                 active={isSharedPage}
+              />
+              <NavItem
+                to="/app/trash"
+                icon={Trash2}
+                label="Trash"
+                active={isTrashPage}
               />
               {isAdmin && (
                 <NavItem

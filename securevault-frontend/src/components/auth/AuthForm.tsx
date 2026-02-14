@@ -171,7 +171,7 @@ export const AuthForm: React.FC<AuthFormProps> = ({ mode }) => {
               onSuccess={async (credentialResponse) => {
                 try {
                   const res = await fetch(
-                    `${import.meta.env.VITE_REST_BASE_URL}/v1/auth/google`,
+                    `${import.meta.env.VITE_REST_BASE_URL}/auth/google`,
                     {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
