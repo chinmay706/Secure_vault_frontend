@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ApolloProvider } from '@apollo/client/react';
+import { GoogleOAuthProvider } from '@react-oauth/google';
 import { apolloClient } from './lib/apollo';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ToastProvider } from './contexts/ToastContext';
@@ -77,15 +78,17 @@ const AppRoutes: React.FC = () => {
 
 function App() {
   return (
-    <ApolloProvider client={apolloClient}>
-      <AuthProvider>
-        <ToastProvider>
-          <ThemeProvider>
-            <AppRoutes />
-          </ThemeProvider>
-        </ToastProvider>
-      </AuthProvider>
-    </ApolloProvider>
+    <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID}>
+      <ApolloProvider client={apolloClient}>
+        <AuthProvider>
+          <ToastProvider>
+            <ThemeProvider>
+              <AppRoutes />
+            </ThemeProvider>
+          </ToastProvider>
+        </AuthProvider>
+      </ApolloProvider>
+    </GoogleOAuthProvider>
   );
 }
 

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { Shield } from 'lucide-react';
+import { GoogleLogin } from '@react-oauth/google';
 import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
@@ -12,7 +13,7 @@ interface AuthFormProps {
 }
 
 export const AuthForm: React.FC<AuthFormProps> = ({ mode }) => {
-  const { user, login, signup } = useAuth();
+  const { user, login, signup, setToken } = useAuth();
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     email: '',
@@ -153,6 +154,48 @@ export const AuthForm: React.FC<AuthFormProps> = ({ mode }) => {
           >
             {mode === 'login' ? 'Sign in' : 'Create account'}
           </Button>
+
+          {/* Divider */}
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-300 dark:border-gray-700" />
+            </div>
+            <div className="relative flex justify-center text-sm">
+              <span className="px-2 bg-surface text-gray-500">or</span>
+            </div>
+          </div>
+
+          {/* Google Sign-in */}
+          <div className="flex justify-center">
+            <GoogleLogin
+              onSuccess={async (credentialResponse) => {
+                try {
+                  const res = await fetch(
+                    `${import.meta.env.VITE_REST_BASE_URL}/v1/auth/google`,
+                    {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ id_token: credentialResponse.credential }),
+                    }
+                  );
+                  const data = await res.json();
+                  if (res.ok) {
+                    setToken(data.token, data.user);
+                    navigate('/app');
+                  } else {
+                    setErrors({ submit: data.error?.message || 'Google login failed' });
+                  }
+                } catch (err) {
+                  console.error('Google login failed:', err);
+                  setErrors({ submit: 'Google login failed. Please try again.' });
+                }
+              }}
+              onError={() => {
+                console.error('Google Login Failed');
+                setErrors({ submit: 'Google login failed. Please try again.' });
+              }}
+            />
+          </div>
         </form>
       </div>
 
