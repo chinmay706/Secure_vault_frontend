@@ -221,3 +221,18 @@ export interface DeleteFolderVariables {
   id: UUID;
   recursive?: boolean;
 }
+
+// Tag-related types (TagInfo, AiTagSuggestion are in types/index.ts)
+export interface SearchSuggestionsResponse {
+  tags: { name: string; count: number; is_ai_generated?: boolean }[];
+  files: FileItem[];
+}
+
+export interface UpdateFileTagsVariables {
+  file_id: UUID;
+  tags: string[];
+}
+
+export interface GenerateAiTagsVariables {
+  file_id: UUID;
+}

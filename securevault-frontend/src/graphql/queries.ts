@@ -375,7 +375,87 @@ export const ADMIN_STATS = gql`
   }
 `;
 
-// 11. Admin Files (admin only)
+// 11a. Get All Tags (unique tags with usage counts)
+export const GET_ALL_TAGS = gql`
+  query GetAllTags {
+    allTags {
+      name
+      count
+      is_ai_generated
+    }
+  }
+`;
+
+// 11b. Get Popular Tags (top N most-used tags)
+export const GET_POPULAR_TAGS = gql`
+  query GetPopularTags($limit: Int) {
+    popularTags(limit: $limit) {
+      name
+      count
+      is_ai_generated
+    }
+  }
+`;
+
+// 11c. Search Suggestions (autocomplete for search)
+export const SEARCH_SUGGESTIONS = gql`
+  query SearchSuggestions($query: String!) {
+    searchSuggestions(query: $query) {
+      tags {
+        name
+        count
+      }
+      files {
+        id
+        original_filename
+        mime_type
+        tags
+        size_bytes
+      }
+    }
+  }
+`;
+
+// 11d. Get AI Tag Suggestions for a file
+export const GET_AI_TAGS = gql`
+  query GetAiTags($file_id: UUID!) {
+    aiTags(file_id: $file_id) {
+      file_id
+      suggested_tags
+      confidence_scores
+      ai_description
+      suggested_folder
+      status
+    }
+  }
+`;
+
+// 11e. Get AI Description for a file
+export const GET_AI_DESCRIPTION = gql`
+  query GetAiDescription($file_id: UUID!) {
+    aiDescription(file_id: $file_id) {
+      file_id
+      description
+      status
+    }
+  }
+`;
+
+// 11f. Get AI Analysis (combined tags + description + folder suggestion)
+export const GET_AI_ANALYSIS = gql`
+  query GetAiAnalysis($file_id: UUID!) {
+    aiAnalysis(file_id: $file_id) {
+      file_id
+      suggested_tags
+      confidence_scores
+      description
+      suggested_folder
+      status
+    }
+  }
+`;
+
+// 12. Admin Files (admin only)
 export const ADMIN_FILES = gql`
   query AdminFiles(
     $page: Int

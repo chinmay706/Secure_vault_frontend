@@ -154,3 +154,69 @@ export interface AuthPayload {
   token: string;
   user: User;
 }
+
+// Tag types for Smart Search & AI Tags
+export interface TagInfo {
+  name: string;
+  count: number;
+  is_ai_generated?: boolean;
+}
+
+export interface AiTagSuggestion {
+  file_id: string;
+  suggested_tags: string[];
+  confidence_scores: number[];
+  status: 'pending' | 'completed' | 'failed';
+}
+
+export interface SearchSuggestion {
+  tags: TagInfo[];
+  files: FileItem[];
+}
+
+export interface AiDescription {
+  file_id: string;
+  description: string;
+  status: 'pending' | 'completed' | 'failed';
+}
+
+export interface AiAnalysis {
+  file_id: string;
+  suggested_tags: string[];
+  confidence_scores: number[];
+  description: string;
+  suggested_folder: string | null;
+  status: 'pending' | 'completed' | 'failed';
+}
+
+export interface ConversionJob {
+  id: string;
+  file_id: string;
+  user_id: string;
+  original_filename: string;
+  source_format: string;
+  target_format: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  error_message: string;
+  result_path: string;
+  result_size_bytes: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AiSummaryVersion {
+  summary: string;
+  command?: string;
+  created_at: string;
+}
+
+export interface AiSummary {
+  file_id: string;
+  summary: string;
+  recommendations: string[];
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  error_message?: string;
+  history: AiSummaryVersion[];
+  created_at: string;
+  updated_at: string;
+}

@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Outlet, Link, useLocation, Navigate } from 'react-router-dom';
-import { Shield, LogOut, Home, Settings, Search, Menu, Database, File, Globe, Trash2 } from 'lucide-react';
+import { Outlet, Link, useLocation, Navigate, useNavigate } from 'react-router-dom';
+import { Shield, LogOut, Home, Settings, Search, Menu, Database, File, Globe, Trash2, Tag, BrainCircuit, FileOutput } from 'lucide-react';
 import { useQuery } from '@apollo/client';
 import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../ui/Button';
@@ -44,6 +44,7 @@ export const clearStatsCache = () => {
 export const AppShell: React.FC = () => {
   const { user, logout } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
   const { addToast } = useToast();
   const [showUserProfile, setShowUserProfile] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -147,6 +148,9 @@ export const AppShell: React.FC = () => {
   const isAdminPage = location.pathname.startsWith('/admin');
   const isSharedPage = location.pathname === '/app/shared';
   const isTrashPage = location.pathname === '/app/trash';
+  const isTagsPage = location.pathname === '/app/tags';
+  const isAiOverviewPage = location.pathname === '/app/ai-overview';
+  const isConverterPage = location.pathname === '/app/converter';
 
   const quotaUsed = stats?.quota_used_bytes || stats?.total_size_bytes || 0;
   const quotaTotal = stats?.quota_bytes || 104857600;
@@ -199,6 +203,7 @@ export const AppShell: React.FC = () => {
             onDownload={handleDownload}
             onPreview={(file) => setPreviewFile(file)}
             anchorRef={searchAnchorRef}
+            onNavigateToTags={() => navigate('/app/tags')}
           />
         </div>
 
@@ -265,6 +270,24 @@ export const AppShell: React.FC = () => {
                 icon={Globe}
                 label="Shared Files"
                 active={isSharedPage}
+              />
+              <NavItem
+                to="/app/tags"
+                icon={Tag}
+                label="Tag Explorer"
+                active={isTagsPage}
+              />
+              <NavItem
+                to="/app/ai-overview"
+                icon={BrainCircuit}
+                label="AI Overview"
+                active={isAiOverviewPage}
+              />
+              <NavItem
+                to="/app/converter"
+                icon={FileOutput}
+                label="File Converter"
+                active={isConverterPage}
               />
               <NavItem
                 to="/app/trash"

@@ -18,7 +18,53 @@ import { PublicFolderPage } from './pages/PublicFolderPage';
 import { PublicFilePage } from './pages/PublicFilePage';
 import { SharedFilesPage } from './pages/SharedFilesPage';
 import { TrashPage } from './pages/TrashPage';
+import { TagExplorerPage } from './pages/TagExplorerPage';
+import { AiOverviewPage } from './pages/AiOverviewPage';
+import { FileConverterPage } from './pages/FileConverterPage';
 import { ToastContainer } from './components/ui/Toast';
+
+// Error Boundary to catch runtime crashes and show the error instead of black screen
+class ErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean; error: Error | null }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('[ErrorBoundary] Caught error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: '40px', fontFamily: 'monospace', background: '#1a1a2e', color: '#eee', minHeight: '100vh' }}>
+          <h1 style={{ color: '#e74c3c', marginBottom: '16px' }}>Something went wrong</h1>
+          <pre style={{ background: '#16213e', padding: '20px', borderRadius: '8px', overflow: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: '#ff6b6b' }}>
+            {this.state.error?.message}
+          </pre>
+          <pre style={{ background: '#16213e', padding: '20px', borderRadius: '8px', overflow: 'auto', marginTop: '12px', fontSize: '12px', color: '#a0a0a0', whiteSpace: 'pre-wrap' }}>
+            {this.state.error?.stack}
+          </pre>
+          <button
+            onClick={() => { this.setState({ hasError: false, error: null }); window.location.href = '/app'; }}
+            style={{ marginTop: '20px', padding: '10px 20px', background: '#3498db', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '14px' }}
+          >
+            Go to Home
+          </button>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
 
 const AppRoutes: React.FC = () => {
   const { user, isLoading } = useAuth();
@@ -53,6 +99,9 @@ const AppRoutes: React.FC = () => {
             <Route path="folder/:folderId" element={<MainPage />} />
             <Route path="shared" element={<SharedFilesPage />} />
             <Route path="trash" element={<TrashPage />} />
+            <Route path="tags" element={<TagExplorerPage />} />
+            <Route path="ai-overview" element={<AiOverviewPage />} />
+            <Route path="converter" element={<FileConverterPage />} />
           </Route>
 
           {/* Admin routes */}
@@ -80,17 +129,19 @@ const AppRoutes: React.FC = () => {
 
 function App() {
   return (
-    <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID}>
-      <ApolloProvider client={apolloClient}>
-        <AuthProvider>
-          <ToastProvider>
-            <ThemeProvider>
-              <AppRoutes />
-            </ThemeProvider>
-          </ToastProvider>
-        </AuthProvider>
-      </ApolloProvider>
-    </GoogleOAuthProvider>
+    <ErrorBoundary>
+      <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID}>
+        <ApolloProvider client={apolloClient}>
+          <AuthProvider>
+            <ToastProvider>
+              <ThemeProvider>
+                <AppRoutes />
+              </ThemeProvider>
+            </ToastProvider>
+          </AuthProvider>
+        </ApolloProvider>
+      </GoogleOAuthProvider>
+    </ErrorBoundary>
   );
 }
 

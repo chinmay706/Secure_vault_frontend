@@ -13,13 +13,22 @@ import {
   FileSpreadsheet,
   Presentation,
   Database,
-  FileJson
+  FileJson,
+  Pencil,
+  Check,
+  Plus,
+  Sparkles,
+  Tag,
+  Brain,
+  RotateCw
 } from 'lucide-react';
+import { useMutation } from '@apollo/client';
 import { FileItem } from '../../types';
 import { Button } from '../ui/Button';
 import { Skeleton } from '../ui/Skeleton';
 import { useAuth } from '../../contexts/AuthContext';
 import { formatFileSize, formatDate } from '../../utils/formatting';
+import { UPDATE_FILE_TAGS } from '../../graphql/mutations';
 
 // Get file icon component based on mime type
 const getFileIcon = (mimeType: string, filename: string) => {
@@ -248,6 +257,298 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const { token } = useAuth();
+
+  // Tag editing state
+  const [isEditingTags, setIsEditingTags] = useState(false);
+  const [editableTags, setEditableTags] = useState<string[]>([]);
+  const [newTagInput, setNewTagInput] = useState('');
+  const [tagSaving, setTagSaving] = useState(false);
+  const tagInputRef = useRef<HTMLInputElement>(null);
+
+  const [updateFileTags] = useMutation(UPDATE_FILE_TAGS);
+
+  // AI tag generation state
+  const [aiGenerating, setAiGenerating] = useState(false);
+  const [aiStatus, setAiStatus] = useState<'idle' | 'polling' | 'done' | 'error'>('idle');
+  const [aiSuggestedTags, setAiSuggestedTags] = useState<string[]>([]);
+  const aiPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // AI description state
+  const [aiDescription, setAiDescription] = useState<string>('');
+  const [aiDescriptionStatus, setAiDescriptionStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle');
+
+  // Sync tags when file changes
+  useEffect(() => {
+    if (file) {
+      setEditableTags(file.tags || []);
+      setIsEditingTags(false);
+      setNewTagInput('');
+      setAiStatus('idle');
+      setAiSuggestedTags([]);
+      setAiGenerating(false);
+      setAiDescription('');
+      setAiDescriptionStatus('idle');
+    }
+    // Cleanup polling on file change
+    return () => {
+      if (aiPollRef.current) {
+        clearInterval(aiPollRef.current);
+        aiPollRef.current = null;
+      }
+    };
+  }, [file?.id]);
+
+  const handleStartEditTags = () => {
+    setEditableTags(file?.tags || []);
+    setIsEditingTags(true);
+    setTimeout(() => tagInputRef.current?.focus(), 100);
+  };
+
+  const handleRemoveTag = (tagToRemove: string) => {
+    setEditableTags(prev => prev.filter(t => t !== tagToRemove));
+  };
+
+  const handleAddTag = () => {
+    const trimmed = newTagInput.trim().toLowerCase();
+    if (trimmed && !editableTags.includes(trimmed)) {
+      setEditableTags(prev => [...prev, trimmed]);
+    }
+    setNewTagInput('');
+  };
+
+  const handleTagKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault();
+      handleAddTag();
+    }
+    if (e.key === 'Backspace' && !newTagInput && editableTags.length > 0) {
+      setEditableTags(prev => prev.slice(0, -1));
+    }
+    if (e.key === 'Escape') {
+      setIsEditingTags(false);
+      setEditableTags(file?.tags || []);
+    }
+  };
+
+  const handleSaveTags = async () => {
+    if (!file) return;
+    setTagSaving(true);
+    try {
+      await updateFileTags({
+        variables: { file_id: file.id, tags: editableTags },
+        errorPolicy: 'all',
+      });
+      // Update the file object's tags in-place for parent components
+      if (file) {
+        file.tags = editableTags;
+      }
+      setIsEditingTags(false);
+    } catch (err) {
+      console.warn('[PreviewModal] Failed to save tags:', err);
+      // Revert on error
+      setEditableTags(file?.tags || []);
+    } finally {
+      setTagSaving(false);
+    }
+  };
+
+  // Generate AI tags with polling
+  const handleGenerateAiTags = async () => {
+    if (!file || !token) return;
+    setAiGenerating(true);
+    setAiStatus('polling');
+    setAiSuggestedTags([]);
+
+    const restBaseUrl = import.meta.env.VITE_REST_BASE_URL || 'http://localhost:8080/api/v1';
+
+    // Trigger via REST POST (more reliable than GraphQL mutation)
+    try {
+      await fetch(`${restBaseUrl}/files/${file.id}/ai-tags`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+    } catch {
+      // Even if trigger fails, try polling — backend auto-triggers on GET too
+    }
+
+    let attempts = 0;
+    const maxAttempts = 20;
+
+    const stopPoll = () => {
+      if (aiPollRef.current) {
+        clearInterval(aiPollRef.current);
+        aiPollRef.current = null;
+      }
+    };
+
+    const poll = async () => {
+      attempts++;
+      try {
+        const response = await fetch(`${restBaseUrl}/files/${file.id}/ai-tags`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        // 202 = still processing — keep polling
+        if (response.status === 202) {
+          if (attempts >= maxAttempts) {
+            stopPoll();
+            setAiStatus('error');
+            setAiGenerating(false);
+          }
+          return;
+        }
+
+        if (!response.ok) {
+          stopPoll();
+          setAiStatus('error');
+          setAiGenerating(false);
+          return;
+        }
+
+        let data: Record<string, unknown>;
+        try {
+          data = await response.json();
+        } catch {
+          if (attempts >= maxAttempts) {
+            stopPoll();
+            setAiStatus('error');
+            setAiGenerating(false);
+          }
+          return;
+        }
+
+        const status: string = (data.status as string) || 'completed';
+
+        if (status === 'completed') {
+          stopPoll();
+          const tags: string[] = (Array.isArray(data.suggested_tags) ? data.suggested_tags : []) as string[];
+          setAiSuggestedTags(tags);
+          setAiStatus(tags.length > 0 ? 'done' : 'error');
+          setAiGenerating(false);
+          // Also capture AI description if returned
+          const desc: string = ((data.ai_description || data.description || '') as string);
+          if (desc) {
+            setAiDescription(desc);
+            setAiDescriptionStatus('done');
+          }
+          return;
+        }
+
+        if (status === 'failed') {
+          stopPoll();
+          setAiStatus('error');
+          setAiGenerating(false);
+          return;
+        }
+
+        // Still processing/pending — keep polling
+        if (attempts >= maxAttempts) {
+          stopPoll();
+          setAiStatus('error');
+          setAiGenerating(false);
+        }
+      } catch {
+        // Network error — keep polling unless max attempts
+        if (attempts >= maxAttempts) {
+          stopPoll();
+          setAiStatus('error');
+          setAiGenerating(false);
+        }
+      }
+    };
+
+    // Immediate first check, then poll every 2.5s
+    poll();
+    aiPollRef.current = setInterval(poll, 2500);
+  };
+
+  // Accept an AI-suggested tag (add to current tags and save)
+  const handleAcceptAiTag = async (tag: string) => {
+    if (!file) return;
+    const currentTags = file.tags || [];
+    if (currentTags.includes(tag)) {
+      setAiSuggestedTags(prev => prev.filter(t => t !== tag));
+      return;
+    }
+    const newTags = [...currentTags, tag];
+    try {
+      await updateFileTags({
+        variables: { file_id: file.id, tags: newTags },
+        errorPolicy: 'all',
+      });
+      file.tags = newTags;
+      setEditableTags(newTags);
+    } catch (err) {
+      console.warn('[PreviewModal] Failed to save tag:', err);
+    }
+    // Always remove from suggestions even if save failed
+    setAiSuggestedTags(prev => prev.filter(t => t !== tag));
+  };
+
+  const handleAcceptAllAiTags = async () => {
+    if (!file || aiSuggestedTags.length === 0) return;
+    const currentTags = file.tags || [];
+    const newTags = [...new Set([...currentTags, ...aiSuggestedTags])];
+    try {
+      await updateFileTags({
+        variables: { file_id: file.id, tags: newTags },
+        errorPolicy: 'all',
+      });
+      file.tags = newTags;
+      setEditableTags(newTags);
+    } catch (err) {
+      console.warn('[PreviewModal] Failed to save all tags:', err);
+    }
+    // Always clear suggestions
+    setAiSuggestedTags([]);
+    setAiStatus('idle');
+  };
+
+  // Generate AI description standalone
+  const handleGenerateAiDescription = async () => {
+    if (!file || !token) return;
+    setAiDescriptionStatus('loading');
+    const restBaseUrl = import.meta.env.VITE_REST_BASE_URL || 'http://localhost:8080/api/v1';
+
+    try {
+      // Try the dedicated ai-describe endpoint first (sync, cached, returns 200)
+      const response = await fetch(`${restBaseUrl}/files/${file.id}/ai-describe`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const desc = (data.description || data.ai_description || '') as string;
+        if (desc) {
+          setAiDescription(desc);
+          setAiDescriptionStatus('done');
+          return;
+        }
+      }
+
+      // Fallback: try the ai-tags endpoint (description might be bundled)
+      const fallbackRes = await fetch(`${restBaseUrl}/files/${file.id}/ai-tags`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (fallbackRes.ok || fallbackRes.status === 202) {
+        try {
+          const data = await fallbackRes.json();
+          const desc = (data.ai_description || data.description || '') as string;
+          if (desc) {
+            setAiDescription(desc);
+            setAiDescriptionStatus('done');
+            return;
+          }
+        } catch { /* ignore parse errors */ }
+      }
+
+      setAiDescriptionStatus('error');
+    } catch {
+      setAiDescriptionStatus('error');
+    }
+  };
 
   const currentBlobUrl = useRef<string | null>(null);
   const currentFileId = useRef<string | null>(null);
@@ -598,16 +899,208 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({
                 </div>
               )}
             </div>
-            {file.tags && file.tags.length > 0 && (
-              <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
-                {file.tags.map((tag) => (
-                  <span
-                    key={tag}
-                    className="inline-flex items-center px-2.5 py-1 text-xs font-medium bg-primary/10 text-primary rounded-full"
+            {/* Editable Tags Section */}
+            <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-1.5">
+                  <Tag className="h-3.5 w-3.5 text-gray-400" />
+                  <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Tags</span>
+                </div>
+                {!isPublic && !isEditingTags && (
+                  <button
+                    onClick={handleStartEditTags}
+                    className="flex items-center gap-1 px-2 py-1 text-xs text-gray-500 hover:text-primary hover:bg-primary/5 rounded-lg transition-colors"
                   >
-                    {tag}
-                  </span>
-                ))}
+                    <Pencil className="h-3 w-3" />
+                    Edit
+                  </button>
+                )}
+                {isEditingTags && (
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => {
+                        setIsEditingTags(false);
+                        setEditableTags(file.tags || []);
+                      }}
+                      className="px-2 py-1 text-xs text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleSaveTags}
+                      disabled={tagSaving}
+                      className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-white bg-primary hover:bg-primary/90 rounded-lg transition-colors disabled:opacity-50"
+                    >
+                      {tagSaving ? (
+                        <div className="h-3 w-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      ) : (
+                        <Check className="h-3 w-3" />
+                      )}
+                      Save
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {isEditingTags ? (
+                <div className="flex flex-wrap gap-1.5 p-2 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700 min-h-[40px]">
+                  {editableTags.map((tag) => (
+                    <span
+                      key={tag}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium bg-primary/10 text-primary rounded-full group/tag"
+                    >
+                      {tag}
+                      <button
+                        onClick={() => handleRemoveTag(tag)}
+                        className="hover:bg-primary/20 rounded-full p-0.5 transition-colors"
+                      >
+                        <X className="h-2.5 w-2.5" />
+                      </button>
+                    </span>
+                  ))}
+                  <div className="flex items-center">
+                    <input
+                      ref={tagInputRef}
+                      type="text"
+                      value={newTagInput}
+                      onChange={(e) => setNewTagInput(e.target.value)}
+                      onKeyDown={handleTagKeyDown}
+                      onBlur={() => { if (newTagInput.trim()) handleAddTag(); }}
+                      placeholder={editableTags.length === 0 ? 'Add tags...' : '+'}
+                      className="bg-transparent border-none outline-none text-xs text-foreground placeholder-gray-400 w-20 min-w-[60px]"
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-1.5">
+                  {(file.tags && file.tags.length > 0) ? (
+                    file.tags.map((tag) => (
+                      <span
+                        key={tag}
+                        className="inline-flex items-center px-2.5 py-1 text-xs font-medium bg-primary/10 text-primary rounded-full"
+                      >
+                        {tag}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="text-xs text-gray-400 dark:text-gray-500 italic">
+                      No tags yet
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {/* AI Tag Generation */}
+              {!isPublic && !isEditingTags && (
+                <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                  {aiStatus === 'idle' && (
+                    <button
+                      onClick={handleGenerateAiTags}
+                      disabled={aiGenerating}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-violet-700 dark:text-violet-400 bg-gradient-to-r from-violet-50 to-purple-50 dark:from-violet-900/20 dark:to-purple-900/20 hover:from-violet-100 hover:to-purple-100 dark:hover:from-violet-900/30 dark:hover:to-purple-900/30 rounded-lg border border-violet-200/50 dark:border-violet-800/30 transition-all"
+                    >
+                      <Sparkles className="h-3 w-3" />
+                      Generate AI Tags
+                    </button>
+                  )}
+
+                  {aiStatus === 'polling' && (
+                    <div className="flex items-center gap-2 px-3 py-2 bg-violet-50 dark:bg-violet-900/10 rounded-lg">
+                      <div className="h-3.5 w-3.5 border-2 border-violet-300 border-t-violet-600 rounded-full animate-spin" />
+                      <span className="text-xs text-violet-600 dark:text-violet-400">Analyzing file with AI...</span>
+                    </div>
+                  )}
+
+                  {aiStatus === 'error' && (
+                    <div className="flex items-center justify-between px-3 py-2 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+                      <span className="text-xs text-gray-500 italic">AI tagging unavailable</span>
+                      <button
+                        onClick={handleGenerateAiTags}
+                        className="text-xs text-violet-600 dark:text-violet-400 hover:underline"
+                      >
+                        Retry
+                      </button>
+                    </div>
+                  )}
+
+                  {aiStatus === 'done' && aiSuggestedTags.length > 0 && (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5">
+                          <Sparkles className="h-3 w-3 text-violet-500" />
+                          <span className="text-xs font-medium text-violet-700 dark:text-violet-400">AI Suggestions</span>
+                        </div>
+                        <button
+                          onClick={handleAcceptAllAiTags}
+                          className="text-[10px] font-medium text-violet-600 dark:text-violet-400 hover:underline"
+                        >
+                          Accept all
+                        </button>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {aiSuggestedTags.map(tag => (
+                          <button
+                            key={tag}
+                            onClick={() => handleAcceptAiTag(tag)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium bg-gradient-to-r from-violet-50 to-purple-50 text-violet-700 dark:from-violet-900/20 dark:to-purple-900/20 dark:text-violet-400 rounded-full border border-violet-200/50 dark:border-violet-800/30 hover:from-violet-100 hover:to-purple-100 transition-all"
+                            title="Click to accept"
+                          >
+                            <Sparkles className="h-2.5 w-2.5" />
+                            {tag}
+                            <Check className="h-2.5 w-2.5 text-green-500 ml-0.5" />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* AI Description Section */}
+            {!isPublic && (
+              <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-1.5">
+                    <Brain className="h-3.5 w-3.5 text-violet-400" />
+                    <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">AI Summary</span>
+                  </div>
+                  {aiDescriptionStatus === 'idle' && (
+                    <button
+                      onClick={handleGenerateAiDescription}
+                      className="flex items-center gap-1 px-2 py-1 text-xs text-violet-600 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-900/20 rounded-lg transition-colors"
+                    >
+                      <Sparkles className="h-3 w-3" />
+                      Generate
+                    </button>
+                  )}
+                  {aiDescriptionStatus === 'error' && (
+                    <button
+                      onClick={handleGenerateAiDescription}
+                      className="flex items-center gap-1 px-2 py-1 text-xs text-violet-600 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-900/20 rounded-lg transition-colors"
+                    >
+                      <RotateCw className="h-3 w-3" />
+                      Retry
+                    </button>
+                  )}
+                </div>
+
+                {aiDescriptionStatus === 'loading' && (
+                  <div className="flex items-center gap-2 px-3 py-2 bg-violet-50 dark:bg-violet-900/10 rounded-lg">
+                    <div className="h-3 w-3 border-2 border-violet-300 border-t-violet-600 rounded-full animate-spin" />
+                    <span className="text-xs text-violet-600 dark:text-violet-400">Generating summary...</span>
+                  </div>
+                )}
+
+                {aiDescriptionStatus === 'done' && aiDescription ? (
+                  <div className="px-3 py-2.5 bg-gradient-to-r from-violet-50/50 to-purple-50/50 dark:from-violet-900/10 dark:to-purple-900/10 rounded-xl border border-violet-100 dark:border-violet-800/20">
+                    <p className="text-xs text-gray-700 dark:text-gray-300 leading-relaxed">{aiDescription}</p>
+                  </div>
+                ) : aiDescriptionStatus === 'idle' ? (
+                  <p className="text-[11px] text-gray-400 italic">Click "Generate" to get an AI-powered file summary</p>
+                ) : aiDescriptionStatus === 'error' ? (
+                  <p className="text-[11px] text-gray-400 italic">AI summary unavailable for this file</p>
+                ) : null}
               </div>
             )}
           </div>

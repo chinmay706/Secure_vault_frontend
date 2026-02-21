@@ -17,7 +17,8 @@ import {
     FileSpreadsheet,
     Presentation,
     Database,
-    FileJson
+    FileJson,
+    Sparkles
 } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { FileItem, FolderItem } from '../../types';
@@ -128,6 +129,31 @@ export const FileCard: React.FC<FileCardProps> = ({
                     {formatFileSize((item as FileItem).size_bytes)}
                 </p>
             )}
+
+            {/* Tags */}
+            {!isFolder && (() => {
+                const tags = (item as FileItem).tags || [];
+                if (tags.length === 0) return null;
+                const visibleTags = tags.slice(0, 2);
+                const remaining = tags.length - 2;
+                return (
+                    <div className="flex flex-wrap items-center gap-1 mt-1.5 px-1 justify-center">
+                        {visibleTags.map((tag) => (
+                            <span
+                                key={tag}
+                                className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-medium bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400 rounded-full max-w-[80px] truncate"
+                            >
+                                {tag}
+                            </span>
+                        ))}
+                        {remaining > 0 && (
+                            <span className="text-[10px] text-gray-400 dark:text-gray-500 font-medium">
+                                +{remaining}
+                            </span>
+                        )}
+                    </div>
+                );
+            })()}
 
             {/* Hover Actions */}
             <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-1 flex space-x-1" onClick={(e) => e.stopPropagation()}>

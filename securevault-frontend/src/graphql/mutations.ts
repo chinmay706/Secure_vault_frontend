@@ -192,3 +192,51 @@ export const EMPTY_TRASH = gql`
     emptyTrash
   }
 `;
+
+// 20. Update File Tags
+export const UPDATE_FILE_TAGS = gql`
+  mutation UpdateFileTags($file_id: UUID!, $tags: [String!]!) {
+    updateFileTags(file_id: $file_id, tags: $tags) {
+      id
+      tags
+      updated_at
+    }
+  }
+`;
+
+// 21. Generate AI Tags (trigger AI tagging for a file)
+export const GENERATE_AI_TAGS = gql`
+  mutation GenerateAiTags($file_id: UUID!) {
+    generateAiTags(file_id: $file_id) {
+      file_id
+      suggested_tags
+      confidence_scores
+      ai_description
+      suggested_folder
+      status
+    }
+  }
+`;
+
+// 22. Generate AI Description (trigger AI description for a file)
+export const GENERATE_AI_DESCRIPTION = gql`
+  mutation GenerateAiDescription($file_id: UUID!) {
+    generateAiDescription(file_id: $file_id) {
+      file_id
+      description
+      status
+    }
+  }
+`;
+
+// 23. Bulk Generate AI Tags (trigger AI tagging for multiple files)
+export const BULK_GENERATE_AI_TAGS = gql`
+  mutation BulkGenerateAiTags($file_ids: [UUID!]!) {
+    bulkGenerateAiTags(file_ids: $file_ids) {
+      queued_count
+      skipped_count
+      status
+      message
+    }
+  }
+`;
